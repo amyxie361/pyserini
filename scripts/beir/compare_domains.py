@@ -101,55 +101,87 @@ def print_results(datasets, results, save_file):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--index_path', type=str, help='path to indexes of all the beir dataset', required=True)
-    parser.add_argument('--index_name_format', type=str, help='define your own index dir path name', default="/lucene-index-beir-{}")
+    #parser.add_argument('--index_name_format', type=str, help='define your own index dir path name', default="/lucene-index-beir-queires-{}")
+    corpus_format = "/corpus/lucene-index-beir-{}"
+    queries_format = "/queries/lucene-index-beir-queires-{}"
     parser.add_argument('--compare_metric', type=str, help='the metric for comparing two vocab, choose from: jaccard, weight_jaccard, df_filter, tf_filter, kl_divergence, js_divergence', default="weight_jaccard")
     parser.add_argument('--compare_threshold', type=float, help='when choosing df_filter, or tf_filter, you can choolse the threshold', default=0.0001)
     parser.add_argument('--output_path', type=str, help='path to save the stat results', required=True)
+    parser.add_argument('--compare_sets', type=str, default="c2c", help="choose from c2c, q2q, q2c")
     args = parser.parse_args()
 
-    beir_datasets = ['trec-covid', 'bioasq', 'nfcorpus', 'nq', 'hotpotqa', 'climate-fever', 'fever', 'dbpedia-entity', 'fiqa', 'signal1m', 'trec-news',  'robust04', 'arguana', 'webis-touche2020', 'quora', 'cqadupstack', 'scidocs', 'scifact', 'msmarco']
+    #beir_datasets = ['trec-covid', 'bioasq', 'nfcorpus', 'nq', 'hotpotqa', 'climate-fever', 'fever', 'dbpedia-entity', 'fiqa', 'signal1m', 'trec-news',  'robust04', 'arguana', 'webis-touche2020', 'quora', 'cqadupstack', 'scidocs', 'scifact', 'msmarco']
+    beir_datasets = ['trec-covid', 'bioasq', 'nfcorpus']
+    # Testing
     #beir_datasets = ['arguana', 'fiqa']
-    cfs = dfs = stats = {}
-    for d in beir_datasets:
-        cf, df, stat = index2stats(args.index_path + args.index_name_format.format(d))
-        cfs[d] = cf # count frequency -- int
-        dfs[d] = df # document frequency -- int
-        stat[d] = stat
+
+    cfs1 = {}
+    dfs1 = {}
+    stats1 = {}
+    cfs2 = {}
+    dfs2 = {}
+    stats2 = {}
+
+    if args.compare_sets == "c2c":
+        for d in beir_datasets:
+            cf, df, stat = index2stats(args.index_path + corpus_format.format(d))
+            cfs1[d] = cf # count frequency -- int
+            dfs1[d] = df # document frequency -- int
+            stats1[d] = stat
+        cfs2 = cfs1
+        dfs2 = dfs1
+        stats2 = stats1
+    elif args.compare_sets == "q2q":
+        for d in beir_datasets:
+            cf, df, stat = index2stats(args.index_path + queries_format.format(d))
+            cfs1[d] = cf
+            dfs1[d] = df
+            stats1[d] = stat
+        cfs2 = cfs1
+        dfs2 = dfs1
+        stats2 = stats1
+    elif args.compare_sets == "q2c":
+        for d in beir_datasets:
+            cf, df, stat = index2stats(args.index_path + queries_format.format(d))
+            cfs1[d] = cf
+            dfs1[d] = df
+            stats1[d] = stat
+            cf, df, stat = index2stats(args.index_path + corpus_format.format(d))
+            cfs2[d] = cf
+            dfs2[d] = df
+            stats2[d] = stat
+    else:
+        raise NotImplementedError("--compare_sets {}".format(args.compare_sets))
+
 
     results = {}
     for d1 in beir_datasets:
         metric_d1 = {}
         for d2 in beir_datasets:
-            if d1 == d2:
-                if args.compare_metric in ["jaccard", "weight_jaccard", "df_filter", "tf_filter"]:
-                    metric_d1[d2] = 1
-                elif args.compare_metric in ["kl_divergence", "js_divergence"]:
-                    metric_d1[d2] = 0
+            if args.compare_metric == "jaccard":
+                metric_d1[d2] = jaccard(cfs1[d1], cfs1[d2])
+            elif args.compare_metric == "weight_jaccard":
+                new_d1 = filter_freq_dict(cf2freq(cfs1[d1]))
+                new_d2 = filter_freq_dict(cf2freq(cfs1[d2]))
+                metric_d1[d2] = weighted_jaccard(new_d1, new_d2)
+            elif args.compare_metric == "df_filter":
+                new_d1 = filter_freq_dict(cf2freq(cfs1[d1]))
+                new_d2 = filter_freq_dict(cf2freq(cfs1[d2]))
+                metric_d1[d2] = jaccard(new_d1, new_d2)
+            elif args.compare_metric == "tf_filter":
+                new_d1 = filter_freq_dict(df2idf(dfs1[d1], stats1[d1]["documents"]))
+                new_d2 = filter_freq_dict(df2idf(dfs1[d2], stats1[d2]["documents"]))
+                metric_d1[d2] = jaccard(new_d1, new_d2)
+            elif args.compare_metric == "kl_divergence":
+                new_d1 = filter_freq_dict(cf2freq(cfs1[d1]))
+                new_d2 = filter_freq_dict(cf2freq(cfs1[d2]))
+                metric_d1[d2] = kl_divergence(new_d1, new_d2)
+            elif args.compare_metric == "js_divergence":
+                new_d1 = filter_freq_dict(cf2freq(cfs1[d1]))
+                new_d2 = filter_freq_dict(cf2freq(cfs1[d2]))
+                metric_d1[d2] = js_divergence(new_d1, new_d2)
             else:
-                if args.compare_metric == "jaccard":
-                    metric_d1[d2] = jaccard(cfs[d1], cfs[d2])
-                elif args.compare_metric == "weight_jaccard":
-                    new_d1 = filter_freq_dict(cf2freq(cfs[d1]))
-                    new_d2 = filter_freq_dict(cf2freq(cfs[d2]))
-                    metric_d1[d2] = weighted_jaccard(new_d1, new_d2)
-                elif args.compare_metric == "df_filter":
-                    new_d1 = filter_freq_dict(cf2freq(cfs[d1]))
-                    new_d2 = filter_freq_dict(cf2freq(cfs[d2]))
-                    metric_d1[d2] = jaccard(new_d1, new_d2)
-                elif args.compare_metric == "tf_filter":
-                    new_d1 = filter_freq_dict(df2idf(dfs[d1], 1))
-                    new_d2 = filter_freq_dict(df2idf(dfs[d2], 1))
-                    metric_d1[d2] = jaccard(new_d1, new_d2)
-                elif args.compare_metric == "kl_divergence":
-                    new_d1 = filter_freq_dict(cf2freq(cfs[d1]))
-                    new_d2 = filter_freq_dict(cf2freq(cfs[d2]))
-                    metric_d1[d2] = kl_divergence(new_d1, new_d2)
-                elif args.compare_metric == "js_divergence":
-                    new_d1 = filter_freq_dict(cf2freq(cfs[d1]))
-                    new_d2 = filter_freq_dict(cf2freq(cfs[d2]))
-                    metric_d1[d2] = js_divergence(new_d1, new_d2)
-                else:
-                    raise NotImplementedError
+                raise NotImplementedError("--compare_metric {}".format(args.compare_metric))
         results[d1] = metric_d1
 
     print_results(beir_datasets, results, args.output_path)

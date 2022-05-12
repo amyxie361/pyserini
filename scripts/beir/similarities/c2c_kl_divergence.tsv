@@ -1,0 +1,4 @@
+	trec-covid	bioasq	nfcorpus
+trec-covid	0.0000	0.0524	0.0457
+bioasq	0.0533	0.0000	0.0186
+nfcorpus	0.1116	0.0963	0.0000

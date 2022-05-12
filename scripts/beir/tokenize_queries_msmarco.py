@@ -68,14 +68,14 @@ def batch_process(batch):
     def process(line):
         if not line:
             return None
-        json_line = json.loads(line)
-        pid = json_line['_id']
-        body = json_line['text']
-        metadata = json_line['metadata']
+        #json_line = json.loads(line)
+        #pid = json_line['_id']
+        #body = json_line['text']
+        #metadata = json_line['metadata']
+        id_, body = line.strip().split("\t")
 
-        doc = {"_id": pid,
-               "text": get_retokenized(bert_tokenizer, body.lower()),
-               "metadata":metadata, }
+        doc = {"id": id_,
+               "contents": get_retokenized(bert_tokenizer, body.lower()),}
         return doc
     
     res = []

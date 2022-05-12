@@ -31,7 +31,7 @@ parser.add_argument('--output', metavar='output file', help='output file',
 parser.add_argument('--workers', metavar='# of processes', help='# of workers to spawn',
                     type=int, default=multiprocessing.cpu_count() - 2)
 parser.add_argument('--tokenizer', metavar='tokenizer', help='tokenizer',
-                    type=str, default='bert-base-cased')
+                    type=str, default='bert-base-uncased')
 
 args = parser.parse_args()
 print(args)
